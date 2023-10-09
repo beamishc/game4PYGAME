@@ -1,12 +1,17 @@
 import pygame
+import pytmx
+import pyscroll
+import os
 from gameobject_class import GameObject
 from playercharacter_class import PC
 from nonplayercharacter_class import NPC
 
+# print(pygame.font.get_fonts())
+
 # size of the game screen
 SCREEN_TITLE = 'Ghost Town'
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 800
+SCREEN_WIDTH = 816
+SCREEN_HEIGHT = 816
 PRE_PLAYER = 'assets/Tiles/tile_0121.png'
 PLAYER = 'assets/Tiles/tile_0119.png'
 GHOSTS = 'assets/Tiles/tile_0125.png'
@@ -14,6 +19,7 @@ SWORD = 'assets/Tiles/tile_0126.png'
 TREASURE = 'assets/Tiles/tile_0134.png'
 HALFLIFE = 'assets/Tiles/tile_0128.png'
 HEARTLESS = 'assets/Tiles/tile_0127.png'
+BACKGROUND = '/Users/cbeams/code/game-builds/monochrome_1.tmx'
 
 # RGB color codes
 WHITE_COLOR = (255, 255, 255)
@@ -23,7 +29,7 @@ BLACK_COLOR = (0, 0, 0)
 clock = pygame.time.Clock()
 
 pygame.font.init()
-font = pygame.font.SysFont('comicsans', 75)
+font = pygame.font.SysFont('baskerville', 96, bold=True)
 
 class Game:
     # Typical rate of 60 , equivalent to FPS
@@ -31,6 +37,7 @@ class Game:
 
     def __init__(self, image_path, title, width, height, player_image, enemy_image, treasure_image, sword_image, pre_player_image):
         self.title = title
+        self.image = BACKGROUND
         self.width = width
         self.height = height
         self.player_image = player_image
@@ -52,38 +59,48 @@ class Game:
         self.game_screen.fill(WHITE_COLOR)
         pygame.display.set_caption(title)
 
-        background_image = pygame.image.load(image_path)
-        self.image = pygame.transform.scale(background_image, (width, height))
+        # background_image = pygame.image.load(image_path)
+        # self.image = pygame.transform.scale(background_image, (width, height))
+
+        # tmxdata = pytmx.TiledMap(BACKGROUND)
+        self.gameMap = pytmx.load_pygame(self.image)
 
     def run_game_loop(self, level_speed):
         is_game_over = False
         did_win = False
         direction = 0
+        px_h = 48
+        px_w = 48
 
         # 'source_files/project_files/player.png'
-        player_character = PC(self.pre_player_image, 375, 700, 50, 50)
+        player_character = PC(self.pre_player_image, 384, 720, px_h, px_w)
         if level_speed >= 1:
-            player_character = PC(self.player_image, 375, 700, 50, 50)
+            player_character = PC(self.player_image, 384, 720, px_h, px_w)
 
         # 'source_files/project_files/enemy.png'
-        enemy_0 = NPC(self.enemy_image, 20, 600, 50, 50)
+        enemy_0 = NPC(self.enemy_image, 24, 624, px_h, px_w)
         enemy_0.SPEED *= level_speed
 
-        enemy_1 = NPC(self.enemy_image, self.width - 40, 400, 50, 50)
+        enemy_1 = NPC(self.enemy_image, self.width - 48, 384, px_h, px_w)
         enemy_1.SPEED *= level_speed
 
-        enemy_2 = NPC(self.enemy_image, 20, 200, 50, 50)
+        enemy_2 = NPC(self.enemy_image, 24, 192, px_h, px_w)
         enemy_2.SPEED *= level_speed
 
         # 'source_files/project_files/treasure.png'
-        treasure = GameObject(self.treasure_image, 375, 50, 50, 50)
-        sword = GameObject(self.sword_image, 375, 50, 50, 50)
+        treasure = GameObject(self.treasure_image, 384, 48, px_h, px_w)
+        sword = GameObject(self.sword_image, 384, 48, px_h, px_w)
 
-        signage = GameObject(self.sign, 300, 675, 50, 50)
+        signage = GameObject(self.sign, 336, 672, px_h, px_w)
 
-        heart1 = GameObject(self.heart, self.width - 150, 10, 50, 50)
-        heart2 = GameObject(self.heart, self.width - 100, 10, 50, 50)
-        heart3 = GameObject(self.heart, self.width - 50, 10, 50, 50)
+        heart1_x = self.width - 144
+        heart2_x = self.width - 96
+        heart3_x = self.width - 48
+        heart_y = 0
+
+        heart1 = GameObject(self.heart, heart1_x, heart_y, px_h, px_w)
+        heart2 = GameObject(self.heart, heart2_x, heart_y, px_h, px_w)
+        heart3 = GameObject(self.heart, heart3_x, heart_y, px_h, px_w)
 
         # Main loop of game - runs until is_game_over == True
         while not is_game_over:
@@ -117,17 +134,26 @@ class Game:
 
             # Clear screen
             self.game_screen.fill(WHITE_COLOR)
-            # self.game_screen.blit(self.image, (0, 0))
+            for layer in self.gameMap.visible_layers:
+                for x, y, gid, in layer:
+                    tile = self.gameMap.get_tile_image_by_gid(gid)
+                    if(tile != None):
+                        self.game_screen.blit(tile, (x * self.gameMap.tilewidth, y * self.gameMap.tileheight))
+
             if level_speed == 1:
                 sword.draw(self.game_screen)
             else:
                 treasure.draw(self.game_screen)
+
             signage.draw(self.game_screen)
+
             heart1.draw(self.game_screen)
             heart2.draw(self.game_screen)
             heart3.draw(self.game_screen)
+
             # Update player position
             player_character.move(direction, self.height)
+
             # Display player at new position
             player_character.draw(self.game_screen)
 
@@ -147,38 +173,41 @@ class Game:
                              , player_character.detect_collision(enemy_2)])
 
             if collision > 0 and self.damage_taken == False:
+                self.game_screen.fill((255,0,0))
                 self.health -= 1
 
             if self.health == 5:
                 self.damage_taken = True
-                heart3 = GameObject(self.halflife, self.width - 50, 10, 50, 50)
+                heart3 = GameObject(self.halflife, heart3_x, heart_y, px_h, px_w)
 
             if self.health == 4:
                 self.damage_taken = True
-                heart3 = GameObject(self.heartless, self.width - 50, 10, 50, 50)
+                heart3 = GameObject(self.heartless, heart3_x, heart_y, px_h, px_w)
 
             if self.health == 3:
                 self.damage_taken = True
-                heart3 = GameObject(self.heartless, self.width - 50, 10, 50, 50)
-                heart2 = GameObject(self.halflife, self.width - 100, 10, 50, 50)
+                heart3 = GameObject(self.heartless, heart3_x, heart_y, px_h, px_w)
+                heart2 = GameObject(self.halflife, heart2_x, heart_y, px_h, px_w)
 
             if self.health == 2:
                 self.damage_taken = True
-                heart3 = GameObject(self.heartless, self.width - 50, 10, 50, 50)
-                heart2 = GameObject(self.heartless, self.width - 100, 10, 50, 50)
+                heart3 = GameObject(self.heartless, heart3_x, heart_y, px_h, px_w)
+                heart2 = GameObject(self.heartless, heart2_x, heart_y, px_h, px_w)
 
             if self.health == 1:
                 self.damage_taken = True
-                heart3 = GameObject(self.heartless, self.width - 50, 10, 50, 50)
-                heart2 = GameObject(self.heartless, self.width - 100, 10, 50, 50)
-                heart1 = GameObject(self.halflife, self.width - 150, 10, 50, 50)
+                heart3 = GameObject(self.heartless, heart3_x, heart_y, px_h, px_w)
+                heart2 = GameObject(self.heartless, heart2_x, heart_y, px_h, px_w)
+                heart1 = GameObject(self.halflife, heart1_x, heart_y, px_h, px_w)
 
             if collision == 0:
                 self.damage_taken = False
 
             if self.health == 0:
                 self.damage_taken = True
-                heart1 = GameObject(self.heartless, self.width - 150, 10, 50, 50)
+                heart3 = GameObject(self.heartless, heart3_x, heart_y, px_h, px_w)
+                heart2 = GameObject(self.heartless, heart2_x, heart_y, px_h, px_w)
+                heart1 = GameObject(self.heartless, heart1_x, heart_y, px_h, px_w)
                 is_game_over = True
                 did_win = False
                 text = font.render('YOU LOSE!', True, BLACK_COLOR)
